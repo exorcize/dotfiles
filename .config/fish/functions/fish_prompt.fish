@@ -1,31 +1,53 @@
-function fish_prompt --description 'Write out the prompt'
-    set -l last_pipestatus $pipestatus
-    set -lx __fish_last_status $status # Export for __fish_print_pipestatus.
-    set -l normal (set_color normal)
-    set -q fish_color_status
-    or set -g fish_color_status red
+# fish theme: gentoo
 
-    # Color the prompt differently when we're root
-    set -l color_cwd $fish_color_cwd
-    set -l suffix ' $'
-    if functions -q fish_is_root_user; and fish_is_root_user
-        if set -q fish_color_cwd_root
-            set color_cwd $fish_color_cwd_root
-        end
-        set suffix '#'
+function _git_branch_name
+  echo (command git symbolic-ref HEAD 2>/dev/null | sed -e 's|^refs/heads/||')
+end
+
+function _is_git_dirty
+  echo (command git status -s --ignore-submodules=dirty 2>/dev/null)
+end
+
+function fish_prompt
+  set fish_greeting
+  set -l cyan (set_color cyan)
+  set -l red (set_color -o red)
+  set -l blue (set_color -o blue)
+  set -l green (set_color -o green)
+  set -l normal (set_color normal)
+  set -l white (set_color -o normal)
+
+  set -l cwd (pwd | sed -e "s!^$HOME!~!g")
+  # output the prompt, left to right:
+  if [ (id -u) = "0" ];
+    set cwd (basename $cwd)
+    # display host
+    echo -n -s $red (uname -n |cut -d . -f 1) " "
+  else
+    # display 'user@host:'
+    echo -n -s $white (whoami) @ $white (uname -n|cut -d . -f 1) ":"
+  end
+
+  # display the current directory name:
+  echo -n -s $cyan $cwd $normal
+
+  # show git branch and dirty state, if applicable:
+  if [ (_git_branch_name) ]
+    set -l git_branch '[' (_git_branch_name) ']'
+
+    if [ (_is_git_dirty) ]
+      set git_info $red $git_branch "×"
+    else
+      set git_info $cyan $git_branch
     end
+    echo -n -s ' ' $git_info $normal
+  end
 
-    # Write pipestatus
-    # If the status was carried over (if no command is issued or if `set` leaves the status untouched), don't bold it.
-    set -l bold_flag --bold
-    set -q __fish_prompt_status_generation; or set -g __fish_prompt_status_generation $status_generation
-    if test $__fish_prompt_status_generation = $status_generation
-        set bold_flag
-    end
-    set __fish_prompt_status_generation $status_generation
-    set -l status_color (set_color $fish_color_status)
-    set -l statusb_color (set_color $bold_flag $fish_color_status)
-    set -l prompt_status (__fish_print_pipestatus "[" "]" "|" "$status_color" "$statusb_color" $last_pipestatus)
-
-    echo -n -s (set_color $color_cwd) (prompt_pwd) $normal (fish_vcs_prompt) $normal " "$prompt_status $suffix " "
+  # terminate with a nice prompt char:
+  if [ (id -u) = "0" ];
+    set indicate '#'
+  else
+    set indicate '$'
+  end
+  echo -n -s $normal "$indicate " $normal
 end
